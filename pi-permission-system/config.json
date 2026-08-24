@@ -1,0 +1,67 @@
+{
+  "$schema": "https://raw.githubusercontent.com/gotgenes/pi-packages/main/packages/pi-permission-system/schemas/permissions.schema.json",
+
+  "debugLog": false,
+  "permissionReviewLog": false,
+  "yoloMode": false,
+  "doublePressToConfirm": true,
+
+  "piInfrastructureReadPaths": [
+    "~/.pi",
+    "~/Downloads"
+  ],
+
+  "permission": {
+    "*": "allow",
+
+    "path": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "~/.ssh/*": "deny"
+    },
+
+    "bash": {
+      "*": "allow",
+      "sudo *": "ask",
+      "rm -rf *": "deny",
+      "rm --recursive*": "deny",
+      "rm -r *": "ask",
+      "chmod * 777*": "ask",
+      "chmod 777*": "ask",
+      "chown * 777*": "ask",
+      "dd *of=/dev/*": "deny",
+      "mkfs*": "deny",
+      "fdisk*": "ask",
+      "shutdown*": "deny",
+      "reboot*": "deny",
+      "halt*": "deny",
+      "poweroff*": "deny",
+      "git push --force*": "ask",
+      "git push -f*": "ask",
+      "git reset --hard*": "ask",
+      "git clean -*": "ask",
+      "git rebase*": "ask",
+      "git commit --amend*": "ask",
+      "npm install*": "ask",
+      "npm i *": "ask",
+      "npm ci*": "ask",
+      "npm uninstall*": "ask",
+      "pnpm install*": "ask",
+      "pnpm add*": "ask",
+      "pnpm remove*": "ask",
+      "yarn add*": "ask",
+      "yarn install*": "ask",
+      "yarn remove*": "ask",
+      "curl * | sh": "deny",
+      "curl * | bash": "deny",
+      "wget * | sh": "deny",
+      "wget * | bash": "deny"
+    },
+
+    "external_directory": {
+      "*": "ask"
+    }
+  }
+}
