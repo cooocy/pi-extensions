@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
-import { Markdown, ScrollView, Box, matchesKey, Key, type Component } from "@earendil-works/pi-tui";
+import { Markdown, matchesKey, Key, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { homedir } from "node:os";
@@ -61,9 +61,11 @@ function extractFlags(content: string): string[] {
 	const flags: string[] = [];
 	// matches: registerFlag("name"  /  registerFlag('name'
 	const re = /registerFlag\s*\(\s*["'`]([^"'`]+)["'`]/g;
-	let m: RegExpExecArray | null;
-	while ((m = re.exec(content)) !== null) {
-		flags.push(m[1]);
+	for (const raw of content.split("\n")) {
+		// strip // line comments so example text in comments isn't picked up
+		const line = raw.replace(/\/\/.*$/, "");
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(line)) !== null) flags.push(m[1]);
 	}
 	return flags;
 }
@@ -300,26 +302,102 @@ export default function (pi: ExtensionAPI) {
 			].join("\n");
 
 			if (ctx.hasUI) {
-				await ctx.ui.custom((_tui, theme, _kb, done) => {
+				await ctx.ui.custom((tui, theme, _kb, done) => {
 					const md = new Markdown(markdown, 0, 0, getMarkdownTheme());
-					const scroll = new ScrollView(md, { scrollbar: "auto" });
-					const box = new Box(1, 1, (s) => theme.bg("customMessageBg", s));
-					box.addChild(scroll);
+					// Overlay maxHeight is "80%" of the terminal. The overlay compositor calls
+					// render(width) directly and slices off the bottom — ScrollView's scroll is
+					// applied by the layout engine, which overlays bypass, so we manage the
+					// viewport ourselves: render the Markdown, slice by scrollTop, pad to a fixed
+					// height so the popup sizes to the terminal instead of the content.
+					const PAD_X = 1;
+					const PAD_Y = 1;
+					const TITLE = "pi · resources";
+					let scrollTop = 0;
+					let lastWidth = 0;
+					let cachedWidth = -1;
+					let cachedLines: string[] = [];
+
+					const mdLines = (width: number): string[] => {
+						if (width !== cachedWidth) {
+							cachedWidth = width;
+							cachedLines = md.render(Math.max(1, width - PAD_X * 2));
+						}
+						return cachedLines;
+					};
+
+					// Reserve 1 title row + 1 spacer row + 1 footer row from the viewport; the middle scrolls.
+					const contentHeight = (): number => {
+						const rows = tui.terminal.rows || process.stdout.rows || 24;
+						const overlayHeight = Math.max(10, Math.floor(rows * 0.8));
+						const vh = Math.max(8, overlayHeight - PAD_Y * 2);
+						return Math.max(4, vh - 3);
+					};
+
+					const clampScroll = (lines: string[], ch: number): number => {
+						const max = Math.max(0, lines.length - ch);
+						return Math.max(0, Math.min(scrollTop, max));
+					};
+
+					const bg = (s: string) => theme.bg("customMessageBg", s);
+					const padLine = (w: number, line: string) => {
+						const fill = Math.max(0, w - PAD_X - visibleWidth(line));
+						return bg(`${" ".repeat(PAD_X)}${line}${" ".repeat(fill)}`);
+					};
+
+					const mdTheme = getMarkdownTheme();
+					// Terminals can't enlarge glyphs, so emulate a bigger title with
+					// uppercase + letter-spacing + bold + underline + heading color.
+					const titleText = TITLE.toUpperCase().split("").join(" ");
+					const titleRow = (w: number) => {
+						const label = mdTheme.heading(mdTheme.bold(mdTheme.underline(titleText)));
+						return padLine(w, label);
+					};
+					const footerRow = (w: number) => {
+						const lines = mdLines(w);
+						const ch = contentHeight();
+						const max = Math.max(0, lines.length - ch);
+						const pos = max === 0 ? "all" : `${scrollTop + 1}-${Math.min(scrollTop + ch, lines.length)}/${lines.length}`;
+						const hint = theme.fg("dim", `↑/↓ scroll  PgUp/PgDn page  Esc/Enter/q close  [${pos}]`);
+						return padLine(w, hint);
+					};
+
 					const view: Component = {
-						render: (w) => box.render(w),
-						invalidate: () => box.invalidate(),
+						render: (w) => {
+							lastWidth = w;
+							const lines = mdLines(w);
+							const ch = contentHeight();
+							scrollTop = clampScroll(lines, ch);
+							const slice = lines.slice(scrollTop, scrollTop + ch);
+							while (slice.length < ch) slice.push("");
+							const out: string[] = [titleRow(w), padLine(w, "")];
+							for (const line of slice) out.push(padLine(w, line));
+							out.push(footerRow(w));
+							return out;
+						},
+						invalidate: () => {
+							cachedWidth = -1;
+							md.invalidate?.();
+						},
 						handleInput: (data) => {
 							if (matchesKey(data, Key.escape) || matchesKey(data, Key.enter) || matchesKey(data, "q")) {
 								done();
-							} else if (matchesKey(data, Key.up)) {
-								scroll.scrollBy(-1);
-							} else if (matchesKey(data, Key.down)) {
-								scroll.scrollBy(1);
-							} else if (matchesKey(data, Key.pageUp)) {
-								scroll.scrollBy(-scroll.viewportHeight);
-							} else if (matchesKey(data, Key.pageDown)) {
-								scroll.scrollBy(scroll.viewportHeight);
+								return;
 							}
+							const lines = mdLines(lastWidth);
+							const ch = contentHeight();
+							const max = Math.max(0, lines.length - ch);
+							if (matchesKey(data, Key.up)) {
+								scrollTop = Math.max(0, scrollTop - 1);
+							} else if (matchesKey(data, Key.down)) {
+								scrollTop = Math.min(max, scrollTop + 1);
+							} else if (matchesKey(data, Key.pageUp)) {
+								scrollTop = Math.max(0, scrollTop - ch);
+							} else if (matchesKey(data, Key.pageDown)) {
+								scrollTop = Math.min(max, scrollTop + ch);
+							} else {
+								return;
+							}
+							tui.requestRender();
 						},
 					};
 					return view;
