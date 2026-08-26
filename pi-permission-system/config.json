@@ -7,8 +7,7 @@
   "doublePressToConfirm": true,
 
   "piInfrastructureReadPaths": [
-    "~/.pi",
-    "~/Downloads"
+    "~"
   ],
 
   "permission": {
@@ -54,6 +53,92 @@
       "yarn add*": "ask",
       "yarn install*": "ask",
       "yarn remove*": "ask",
+
+      "npm run *": "ask",
+      "npm test*": "ask",
+      "npm start*": "ask",
+      "npm exec *": "ask",
+      "npm pack*": "ask",
+      "pnpm run *": "ask",
+      "pnpm test*": "ask",
+      "pnpm exec *": "ask",
+      "yarn run *": "ask",
+      "yarn test*": "ask",
+      "yarn exec *": "ask",
+
+      "make": "ask",
+      "make *": "ask",
+      "cmake *": "ask",
+
+      "java *": "ask",
+      "java -version*": "allow",
+      "java --version*": "allow",
+      "javac *": "ask",
+      "mvn": "ask",
+      "mvn *": "ask",
+      "gradle": "ask",
+      "gradle *": "ask",
+      "./mvnw": "ask",
+      "./mvnw *": "ask",
+      "./gradlew": "ask",
+      "./gradlew *": "ask",
+
+      "go build*": "ask",
+      "go run*": "ask",
+      "go test*": "ask",
+      "go install*": "ask",
+      "go generate*": "ask",
+      "go vet*": "ask",
+      "go mod *": "ask",
+      "go get *": "ask",
+
+      "python *": "ask",
+      "python --version*": "allow",
+      "python -V*": "allow",
+      "python3 *": "ask",
+      "python3 --version*": "allow",
+      "python3 -V*": "allow",
+      "pip install *": "ask",
+      "pip3 install *": "ask",
+      "pytest*": "ask",
+      "poetry *": "ask",
+      "poetry --version*": "allow",
+      "uv *": "ask",
+      "uv --version*": "allow",
+      "pipenv *": "ask",
+
+      "node *": "ask",
+      "node --version*": "allow",
+      "node -v*": "allow",
+      "npx *": "ask",
+      "tsx *": "ask",
+      "ts-node *": "ask",
+      "tsc *": "ask",
+      "deno *": "ask",
+      "deno --version*": "allow",
+      "bun *": "ask",
+      "bun --version*": "allow",
+
+      "cargo *": "ask",
+      "cargo --version*": "allow",
+      "cargo -V*": "allow",
+      "cargo fmt*": "allow",
+      "cargo clippy*": "allow",
+      "rustc *": "ask",
+      "rustc --version*": "allow",
+      "rustc -V*": "allow",
+
+      "gcc *": "ask",
+      "gcc --version*": "allow",
+      "g++ *": "ask",
+      "g++ --version*": "allow",
+      "cc *": "ask",
+      "cc --version*": "allow",
+      "clang *": "ask",
+      "clang --version*": "allow",
+      "clang++ *": "ask",
+      "clang++ --version*": "allow",
+
       "curl * | sh": "deny",
       "curl * | bash": "deny",
       "wget * | sh": "deny",
@@ -61,7 +146,9 @@
     },
 
     "external_directory": {
-      "*": "ask"
+      "*": "ask",
+      "~/Downloads": "allow",
+      "~/Downloads/*": "allow"
     }
   }
 }
