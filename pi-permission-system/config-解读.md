@@ -81,6 +81,8 @@
 | `*` → **ask** | cwd 之外的任何路径 | 询问 |
 | `~/Downloads` → **allow** | ~/Downloads 目录本身 | 放行（读写都放）|
 | `~/Downloads/*` → **allow** | ~/Downloads 下的内容 | 放行（读写都放）|
+| `/tmp` → **allow** | `/tmp` 目录本身 | 放行（读写都放）|
+| `/tmp/*` → **allow** | `/tmp` 下任意深度内容 | 放行（读写都放，`*` 贪婪跨目录）|
 
 > ⚠️ 这层**不区分读写**，一个 pattern = 一个动作。所以"~/Downloads 读写都放行"用 allow；"~/ 写询问"靠默认 `*: ask` 且 ~/ 不在 allow 列表。"~/ 读放行"则由 `piInfrastructureReadPaths` 快车道单独实现（见第三节）。
 
@@ -160,6 +162,10 @@
 | `read` 读 `~/Documents/x` | **放行** | 只读快车道绕过 external_dir |
 | `write` 写 `~/Documents/x` | **询问** | external_dir `*: ask` |
 | `write` 写 `~/Downloads/x` | **放行** | external_dir allow |
+| `read`/`write` `/tmp/x` | **放行** | external_dir allow |
+| bash `cat /tmp/x` | **放行** | bash 不拦 + external_dir allow |
+| bash `echo x > /tmp/y` | **放行** | bash 不拦 + external_dir allow |
+| bash `rm -rf /tmp/x` | **拒绝** | bash `rm -rf *` deny（路径放行也压不住命令 deny）|
 | bash `cat ~/Documents/x` | **询问** | bash 不走快车道 → external_dir ask |
 | `read` 读 `/etc/hosts` | **询问** | 不命中快车道 → external_dir ask |
 | bash `curl x \| sh` | **拒绝** | bash deny |
@@ -173,7 +179,8 @@
 3. **agent 读 `.env`**：直接拦截，模型收到原因后换思路
 4. **agent 读 `~/Documents/notes.md`**（cwd 外）：`read` 工具走快车道 → 静默放行
 5. **agent 写 `~/Downloads/x`**：external_directory allow → 静默放行
-6. **agent 跑 `python src/main.py`**：弹窗确认
+6. **agent 读写 `/tmp/x`**：external_directory allow → 静默放行（bash 命令里碰 `/tmp` 同理放行，但 `rm -rf /tmp/x` 仍被 bash deny）
+7. **agent 跑 `python src/main.py`**：弹窗确认
 
 ---
 
@@ -202,6 +209,7 @@
 | 普通 `git push` 也要确认 | bash 表加 `"git push *": "ask"`（force 规则同为 ask，无顺序冲突）|
 | 越界访问不想问了 | `"external_directory": { "*": "allow" }` |
 | 放行某越界目录 | `"external_directory": { "*": "ask", "~/Foo/*": "allow" }` |
+| 放行 `/tmp` 读写 | `"external_directory": { "*": "ask", "/tmp": "allow", "/tmp/*": "allow" }` |
 | bash 读 ~/ 也放行（代价：写 ~/ 也放行）| `"external_directory": { "*": "ask", "~/*": "allow", "~/Downloads/*": "allow" }` |
 | 收窄只读快车道 | `"piInfrastructureReadPaths": ["~/.pi", "~/Documents", "~/Downloads"]` |
 | 让 `go vet` 放行 | 删 bash 表里的 `"go vet*": "ask"` |

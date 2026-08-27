@@ -148,7 +148,9 @@
     "external_directory": {
       "*": "ask",
       "~/Downloads": "allow",
-      "~/Downloads/*": "allow"
+      "~/Downloads/*": "allow",
+      "/tmp": "allow",
+      "/tmp/*": "allow"
     }
   }
 }
