@@ -35,7 +35,7 @@ Then in pi:
 
 ## How it works
 
-- `setup.sh` symlinks every `*.ts` / `*.js` file and every non-hidden directory at the repo root into `~/.pi/agent/extensions/`. Repo metadata (`README.md`, `setup.sh`, `.gitignore`, `LICENSE`) is skipped.
+- `setup.sh` is driven by a single `INSTALL` table at the top of the script that maps each repo entry to an install method: `symlink` (link into `~/.pi/agent/extensions/`), `pi-install` (register via `pi install` so it loads after `pi-open-tui`), `copy` (copy into `~/.pi/agent/`), or `skip` (kept in repo, not installed). To install a new extension, add a row; to stop installing one, set it to `skip`. There is no auto-scan of the repo.
 - pi scans `~/.pi/agent/extensions/` for `.ts` entry points and loads them as extensions. The `pi-permission-system/` directory is read by the `@gotgenes/pi-permission-system` package for its config.
 
 ## Why rainbow-editor is not installed

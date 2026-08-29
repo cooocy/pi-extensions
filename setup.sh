@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 #
-# setup.sh — install the pi extensions and config files from this repo
+# setup.sh — install the pi extensions and config files from this repo.
 #
-# Default install path: symlink repo-root *.ts/*.js files and non-hidden
-# directories into ~/.pi/agent/extensions/. Repo metadata (README*, setup.sh,
-# .gitignore, LICENSE) is skipped.
+# Driven by a single INSTALL table (associative array) near the top of this
+# file. Each repo entry maps to one of four install methods:
 #
-# Optional mechanisms (currently unused — keep arrays empty to disable):
-#  - INSTALL_VIA_PI: register local files via `pi install` into
-#    ~/.pi/agent/settings.json `packages` so they load AFTER pi-open-tui.
-#    (Local paths only; never trigger network fetches.)
-#  - COPY_CONFIGS: copy repo-root config files into ~/.pi/agent/ (not
-#    symlinked) so each machine keeps its own edits.
+#   symlink     symlink into ~/.pi/agent/extensions/   (*.ts / *.js / dirs)
+#   pi-install  register via `pi install` into ~/.pi/agent/settings.json
+#               packages[] — loads AFTER pi-open-tui (local paths, no network)
+#   copy        copy into ~/.pi/agent/ (per-machine, not symlinked)
+#   skip        keep in repo, do not install (cleans up any stale symlink)
 #
-# Safe to re-run (idempotent). Existing real files/dirs at a symlink target are
-# backed up to <name>.bak.<timestamp> before being replaced. An existing config
-# file at the destination is preserved (never overwritten) — delete it first to
-# refresh it from the repo.
+# Add a row to install a new extension; set its value to `skip` to stop
+# installing one. There is no auto-scan of the repo — only table entries are
+# touched.
+#
+# Safe to re-run (idempotent). Existing real files/dirs at a symlink target
+# are backed up to <name>.bak.<timestamp> before being replaced. An existing
+# copied config at the destination is preserved (never overwritten) — delete it
+# first to refresh it from the repo.
 #
 set -euo pipefail
 
@@ -24,41 +26,20 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="$HOME/.pi/agent/extensions"
 AGENT_DIR="$HOME/.pi/agent"
 
-# Repo-root config files copied (not symlinked) into ~/.pi/agent/. Add entries
-# here as new configurable extensions are added. Empty = skip the section.
-COPY_CONFIGS=()
-
-# Entries here are registered via `pi install` (into settings.json packages,
-# appended after npm:pi-open-tui) instead of symlinked into extensions/. Use
-# this for extensions that must load AFTER pi-open-tui to win the editor
-# component. (Local paths only — no network.) Empty = skip the section.
-# NOTE: `rainbow-editor.ts` was here previously but is intentionally NOT
-# installed now — see README.md for why.
-INSTALL_VIA_PI=()
-
-# Repo-root extensions that are deliberately NOT installed by this script at
-# all (neither symlinked nor `pi install`ed). They ship in the repo as
-# standalone/opt-in extensions; install them manually if you want them.
-# (Any leftover symlink from a previous install is removed, not left stale.)
-SKIP_INSTALL=("rainbow-editor.ts")
-
-# Top-level entries that are repo metadata, not extensions.
-is_metadata() {
-    case "$1" in
-        README.md|setup.sh|.gitignore|LICENSE|LICENSE.md) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# is an entry in the SKIP_INSTALL list?
-is_skip_install() {
-    local needle="$1"
-    local e
-    for e in "${SKIP_INSTALL[@]}"; do
-        [ "$e" = "$needle" ] && return 0
-    done
-    return 1
-}
+# ──────────────────────────────────────────────────────────────────────────
+# The single source of truth: which repo entries to install, and how.
+# Add a row to install something; set its value to `skip` to stop installing.
+# ──────────────────────────────────────────────────────────────────────────
+declare -A INSTALL=(
+    [git-trailer.ts]=symlink
+    [show-resources.ts]=symlink
+    [pi-permission-system]=symlink
+    # rainbow-editor.ts conflicts with pi-open-tui (see README); left as opt-in.
+    [rainbow-editor.ts]=skip
+    # To enable rainbow-editor, comment the line above and use these instead:
+    #     [rainbow-editor.ts]=pi-install
+    #     [rainbow-editor.json]=copy
+)
 
 link_item() {
     local name="$1"
@@ -86,8 +67,6 @@ link_item() {
     echo "  + $name (linked)"
 }
 
-# Remove a stale symlink target left by an earlier symlink-based install of an
-# extension that now installs via `pi install`. No-op if absent.
 remove_stale_symlink() {
     local name="$1"
     local dst="$TARGET_DIR/$name"
@@ -97,8 +76,6 @@ remove_stale_symlink() {
     fi
 }
 
-# Register a local extension with `pi install` (user scope). Idempotent:
-# `pi install` no-ops when the source is already in settings packages.
 pi_install() {
     local name="$1"
     local src="$REPO_DIR/$name"
@@ -119,8 +96,6 @@ pi_install() {
     fi
 }
 
-# Copy a config file into ~/.pi/agent/. An existing destination is preserved so
-# local edits survive re-runs; delete the destination to refresh from the repo.
 copy_config() {
     local name="$1"
     local src="$REPO_DIR/$name"
@@ -134,95 +109,57 @@ copy_config() {
     echo "  + $name (copied config)"
 }
 
-# is an entry in the INSTALL_VIA_PI list?
-is_install_via_pi() {
-    local needle="$1"
-    local e
-    for e in "${INSTALL_VIA_PI[@]}"; do
-        [ "$e" = "$needle" ] && return 0
-    done
-    return 1
+skip_item() {
+    local name="$1"
+    local src="$REPO_DIR/$name"
+    local dst="$TARGET_DIR/$name"
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
+        rm "$dst"
+        echo "  - $name (removed stale symlink)"
+    else
+        echo "  · $name (not installed)"
+    fi
 }
 
-shopt -s nullglob
+# Process every table entry whose method matches, in sorted name order.
+# Methods with no entries print nothing.
+dispatch_group() {
+    local method="$1" label="$2" dest="$3"
+    local names=() name src
+    for name in "${!INSTALL[@]}"; do
+        if [[ "${INSTALL[$name]}" == "$method" ]]; then
+            names+=("$name")
+        fi
+    done
+    ((${#names[@]})) || return 0
+    mapfile -t names < <(printf '%s\n' "${names[@]}" | sort)
 
-# Collect entries into install-path buckets so each section's output only
-# lists items that actually take that path. Config files (*.json at repo root
-# or in COPY_CONFIGS) get their own section; the rest split by INSTALL_VIA_PI.
-LINK_NAMES=()
-PI_INSTALL_NAMES=()
-SKIP_STALE_NAMES=()
-for entry in "$REPO_DIR"/*; do
-    name="$(basename "$entry")"
-    # hidden entries (.git, etc.) are not matched by the non-dotglob glob
-    if is_metadata "$name"; then
-        continue
-    fi
-    case "$name" in
-        *.json) continue ;; # config files handled in their own section
-    esac
-    if is_skip_install "$name"; then
-        SKIP_STALE_NAMES+=("$name")
-        continue
-    fi
-    if [ -f "$entry" ]; then
-        case "$name" in
-            *.ts|*.js)
-                if is_install_via_pi "$name"; then
-                    PI_INSTALL_NAMES+=("$name")
-                else
-                    LINK_NAMES+=("$name")
-                fi
-                ;;
-            *) ;; # skip non-code files at repo root
+    printf "%-10s →  %s\n" "$label" "$dest"
+    for name in "${names[@]}"; do
+        src="$REPO_DIR/$name"
+        if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+            echo "  ! $name (missing in repo, skipped)" >&2
+            continue
+        fi
+        case "$method" in
+            symlink)    link_item "$name" ;;
+            pi-install)  pi_install "$name" || true ;;
+            copy)        copy_config "$name" ;;
+            skip)        skip_item "$name" ;;
         esac
-    elif [ -d "$entry" ]; then
-        LINK_NAMES+=("$name")
-    fi
-done
+    done
+    echo
+}
 
 mkdir -p "$TARGET_DIR" "$AGENT_DIR"
 
-# Remove leftover symlinks for entries now in SKIP_INSTALL (from an earlier
-# setup run that did install them). The header is printed only when at least one
-# stale symlink is actually removed, so a clean re-run prints nothing here.
-for name in "${SKIP_STALE_NAMES[@]}"; do
-    if [ -L "$TARGET_DIR/$name" ] && [ "$(readlink "$TARGET_DIR/$name")" = "$REPO_DIR/$name" ]; then
-        if [ -z "${_tidying_header_printed:-}" ]; then
-            echo "Tidying skipped extensions"
-            _tidying_header_printed=1
-        fi
-        rm "$TARGET_DIR/$name"
-        echo "  - $name (removed stale symlink; not installed — see README)"
-    fi
-done
-
-echo "Symlinking pi extensions"
-echo "  repo:   $REPO_DIR"
-echo "  target: $TARGET_DIR"
-for name in "${LINK_NAMES[@]}"; do
-    link_item "$name"
-done
-
-if [ "${#PI_INSTALL_NAMES[@]}" -gt 0 ]; then
-    echo
-    echo "Registering via pi install (loads after pi-open-tui)"
-    echo "  target: $AGENT_DIR/settings.json packages[]"
-    for name in "${PI_INSTALL_NAMES[@]}"; do
-        pi_install "$name" || true
-    done
-fi
-
-if [ "${#COPY_CONFIGS[@]}" -gt 0 ]; then
-    echo
-    echo "Copying config files"
-    echo "  target: $AGENT_DIR"
-    for name in "${COPY_CONFIGS[@]}"; do
-        if [ -f "$REPO_DIR/$name" ]; then
-            copy_config "$name"
-        fi
-    done
-fi
-
+echo "pi-extensions setup"
+echo "  repo: $REPO_DIR"
 echo
+
+dispatch_group symlink    "symlink"    "$TARGET_DIR"
+dispatch_group pi-install  "pi install" "$AGENT_DIR/settings.json packages[]"
+dispatch_group copy       "copy"       "$AGENT_DIR"
+dispatch_group skip       "skip"       "(kept in repo, not installed)"
+
 echo "Done. Run /reload in pi to pick up changes."
