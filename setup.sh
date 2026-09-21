@@ -33,6 +33,7 @@ AGENT_DIR="$HOME/.pi/agent"
 declare -A INSTALL=(
     [git-trailer.ts]=symlink
     [show-resources.ts]=symlink
+    [show-prompt.ts]=symlink
     [pi-permission-system]=symlink
     # rainbow-editor.ts conflicts with pi-open-tui (see README); left as opt-in.
     [rainbow-editor.ts]=skip

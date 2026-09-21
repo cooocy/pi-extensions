@@ -1,6 +1,6 @@
 # pi-extensions
 
-Personal [pi](https://github.com/earendil-works/pi-coding-agent) agent extensions. Each entry here is symlinked into `~/.pi/agent/extensions/` by `setup.sh`, and pi auto-loads it on startup (or after `/reload`).
+Personal [pi](https://github.com/earendil-works/pi-coding-agent) agent extensions. `setup.sh` installs the entries according to its `INSTALL` table — mostly symlinks into `~/.pi/agent/extensions/` — and pi auto-loads them on startup (or after `/reload`).
 
 ## Contents
 
@@ -8,6 +8,7 @@ Personal [pi](https://github.com/earendil-works/pi-coding-agent) agent extension
 | --- | --- | --- | --- |
 | `git-trailer.ts` | extension | Appends `Assisted-by: Pi / <modelName>` to `git commit` messages by intercepting `bash` tool calls via a `tool_call` hook. |
 | `show-resources.ts` | extension | `/resources` command — lists every extension's registered flag / command / tool / skill as a rendered markdown table in an overlay panel (with `customMessageBg` background). |
+| `show-prompt.ts` | extension | `/show-prompt` command — shows the system prompt exactly as sent to the model (captured from the `before_provider_request` payload; falls back to the turn-start snapshot, or live state before the session's first LLM call) in a scrollable Markdown overlay with `y` copy, and checks whether the pi-memory block made it into what was sent. `/show-prompt tools` shows the captured request's `tools` array. Both dump to `~/.pi/agent/last-system-prompt.md` / `last-provider-tools.json`. |
 | `pi-permission-system/` | config | Config directory for [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) — `config.json` holds personal allow/ask/deny permission rules. Not self-authored code. |
 | `rainbow-editor.ts` | extension (not installed) | Highlights regex matches typed into the input editor with an animated rainbow shine. Patterns come from `rainbow-editor.json`. See [Why rainbow-editor is not installed](#why-rainbow-editor-is-not-installed) below. |
 

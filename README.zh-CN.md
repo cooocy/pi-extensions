@@ -1,6 +1,6 @@
 # pi-extensions
 
-个人的 [pi](https://github.com/earendil-works/pi-coding-agent) agent 扩展集合。这里的每个条目通过 `setup.sh` 软链到 `~/.pi/agent/extensions/`，pi 在启动时（或 `/reload` 后）自动加载。
+个人的 [pi](https://github.com/earendil-works/pi-coding-agent) agent 扩展集合。`setup.sh` 按其 `INSTALL` 表安装各条目（大部分软链到 `~/.pi/agent/extensions/`）；pi 在启动时（或 `/reload` 后）自动加载。
 
 ## 内容
 
@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `git-trailer.ts` | 扩展 | 拦截 `bash` 工具调用，在 `git commit` 的 message 底部自动追加 `Assisted-by: Pi / <modelName>` trailer。通过 `tool_call` 事件钩子实现。 |
 | `show-resources.ts` | 扩展 | `/resources` 命令——以渲染后的 markdown 表格列出所有扩展注册的 flag / command / tool / skill，在 overlay 浮层中展示，带 `customMessageBg` 底色。 |
+| `show-prompt.ts` | 扩展 | `/show-prompt` 命令——展示实际发给模型的完整系统提示词：优先取自 `before_provider_request` 的真实请求载荷（取不到时回退到 turn 开始时的快照、或首轮 LLM 调用前的实时状态），在可滚动的 markdown 浮层中查看，`y` 复制原文，并检查 pi-memory 块是否真的被注入；`/show-prompt tools` 展示捕获到的请求里的 `tools` 数组。两者分别转储到 `~/.pi/agent/last-system-prompt.md` / `last-provider-tools.json`。 |
 | `pi-permission-system/` | 配置 | [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) 的配置目录——`config.json` 存放个人的 allow/ask/deny 权限规则。非自建代码。 |
 | `rainbow-editor.ts` | 扩展（未安装） | 给输入框里匹配到的正则加彩虹流光高亮，正则来自 `rainbow-editor.json`。为何没装见下方[为什么 rainbow-editor 没装](#为什么-rainbow-editor-没装)。 |
 
@@ -35,7 +36,7 @@ cd ~/firelink/pi-extensions
 
 ## 工作原理
 
-- `setup.sh` 把 repo 根目录下每个 `*.ts` / `*.js` 文件、以及每个非隐藏目录软链到 `~/.pi/agent/extensions/`。repo 元数据（`README.md`、`setup.sh`、`.gitignore`、`LICENSE`）会被跳过。
+- `setup.sh` 由脚本顶部的一张 `INSTALL` 表驱动，把每个 repo 条目映射到一种安装方式：`symlink`（软链到 `~/.pi/agent/extensions/`）、`pi-install`（经 `pi install` 注册进 `settings.json` 的 `packages`，从而排在 pi-open-tui 之后加载）、`copy`（拷贝到 `~/.pi/agent/`）、`skip`（留在 repo、不安装）。要装新扩展就加一行；要停装某个就设为 `skip`。没有对 repo 的自动扫描。
 - pi 扫描 `~/.pi/agent/extensions/` 下的 `.ts` 入口作为扩展加载。`pi-permission-system/` 目录由 `@gotgenes/pi-permission-system` 包读取其配置。
 
 ## 为什么 rainbow-editor 没装
