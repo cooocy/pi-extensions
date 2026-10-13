@@ -1,17 +1,14 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme, copyToClipboard } from "@earendil-works/pi-coding-agent";
 import { Markdown, matchesKey, Key, visibleWidth, type Component } from "@earendil-works/pi-tui";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 
 /**
  * show-prompt — inspect what pi actually sends to the model.
  *
  *   /show-prompt        system prompt as sent (after every injection layer),
- *                       rendered as Markdown, dumped to last-system-prompt.md
+ *                       rendered as Markdown
  *   /show-prompt tools  the provider request's `tools` array: per-tool summary
- *                       plus raw JSON, dumped to last-provider-tools.json
+ *                       plus raw JSON
  *
  * Sources, best first (labeled in the viewer header):
  *   1. before_provider_request — the literal HTTP request payload captured
@@ -24,9 +21,6 @@ import { homedir } from "node:os";
  * Keys:  y/c copy (raw text of the shown mode) · g/G jump top/end ·
  *        ↑/↓ PgUp/PgDn scroll · Esc/Enter/q close.
  */
-
-const OUT_PATH = join(homedir(), ".pi", "agent", "last-system-prompt.md");
-const OUT_PATH_TOOLS = join(homedir(), ".pi", "agent", "last-provider-tools.json");
 
 interface PromptSnapshot {
 	text: string;
@@ -243,7 +237,7 @@ function toolsDoc(tools: unknown[], at: number): { doc: string; raw: string } {
 	const approx = Math.round(raw.length / 4);
 	const header =
 		`> **Provider request tools** — captured from the actual provider request at ${new Date(at).toLocaleTimeString()}\n` +
-		`> ${tools.length} tools · raw array ${raw.length} chars (~${approx} tok, chars/4) · saved to \`${OUT_PATH_TOOLS}\` (y copies the raw JSON)`;
+		`> ${tools.length} tools · raw array ${raw.length} chars (~${approx} tok, chars/4) (y copies the raw JSON)`;
 	return {
 		doc: `${header}\n\n${entries.join("\n\n")}\n\n---\n\n\`\`\`json\n${raw}\n\`\`\``,
 		raw,
@@ -282,7 +276,6 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 				const { doc, raw } = toolsDoc(snap.tools, snap.at);
-				writeFileSync(OUT_PATH_TOOLS, raw);
 				if (!ctx.hasUI) {
 					console.log(doc);
 					return;
@@ -298,7 +291,6 @@ export default function (pi: ExtensionAPI) {
 			const livePrompt = ctx.getSystemPrompt();
 			const snap = snapshot;
 			const prompt = snap?.text ?? livePrompt;
-			writeFileSync(OUT_PATH, prompt);
 
 			const rawLines = prompt.split("\n");
 			const memoryLine = rawLines.indexOf("## Persistent memory") + 1;
@@ -313,7 +305,7 @@ export default function (pi: ExtensionAPI) {
 					: snap
 						? `memory block: MISSING from what was actually sent (check pi-memory config/flags)`
 						: `memory block: not in base prompt (expected before the first turn)`;
-			const summary = `${memoryNote} · ${rawLines.length} lines · ~${approxTokens} tok · saved to \`${OUT_PATH}\``;
+			const summary = `${memoryNote} · ${rawLines.length} lines · ~${approxTokens} tok`;
 
 			if (!ctx.hasUI) {
 				console.log(basis);
