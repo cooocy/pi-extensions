@@ -6,6 +6,7 @@ Personal [pi](https://github.com/earendil-works/pi-coding-agent) agent extension
 
 | Entry | Kind | What it does | [中文](README.zh-CN.md) |
 | --- | --- | --- | --- |
+| `codex-usage.ts` | extension | `/codex-usage` command — shows remaining Codex subscription quota for the 5-hour and 7-day windows, reset times, and available reset counts in a scrollable overlay. |
 | `git-trailer.ts` | extension | Appends `Assisted-by: Pi / <modelName>` to `git commit` messages by intercepting `bash` tool calls via a `tool_call` hook. |
 | `show-resources.ts` | extension | `/resources` command — lists every extension's registered flag / command / tool / skill as a rendered markdown table in an overlay panel (with `customMessageBg` background). |
 | `show-prompt.ts` | extension | `/show-prompt` command — shows the system prompt exactly as sent to the model (captured from the `before_provider_request` payload; falls back to the turn-start snapshot, or live state before the session's first LLM call) in a scrollable Markdown overlay with `y` copy, and checks whether the pi-memory block made it into what was sent. `/show-prompt tools` shows the captured request's `tools` array. Both use in-memory snapshots without writing dump files. |
@@ -33,6 +34,12 @@ Then in pi:
 ```
 
 `setup.sh` is idempotent — re-running it only fixes missing or stale links. If a real file or directory already exists at a target path (e.g. a previous non-symlinked install), it is backed up to `<name>.bak.<timestamp>` before the symlink is created, so nothing is overwritten destructively.
+
+## Codex usage
+
+After setup and `/reload`, run `/codex-usage` in pi. Sign in to OpenAI Codex via `/login` first. The command reads the existing OAuth access token and account ID from `~/.pi/agent/auth.json` and sends them to `https://chatgpt.com/backend-api/wham/usage`; it does not refresh credentials automatically. If they expire, sign in again. The response format depends on this external endpoint.
+
+Use ↑/↓ or PgUp/PgDn to scroll, and Esc, Enter, or `q` to close. Esc also cancels a pending query; requests time out after 15 seconds.
 
 ## How it works
 

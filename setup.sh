@@ -31,6 +31,7 @@ AGENT_DIR="$HOME/.pi/agent"
 # Add a row to install something; set its value to `skip` to stop installing.
 # ──────────────────────────────────────────────────────────────────────────
 declare -A INSTALL=(
+    [codex-usage.ts]=symlink
     [git-trailer.ts]=symlink
     [show-resources.ts]=symlink
     [show-prompt.ts]=symlink
